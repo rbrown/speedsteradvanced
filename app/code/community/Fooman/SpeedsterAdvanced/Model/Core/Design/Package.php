@@ -30,6 +30,17 @@ class Fooman_SpeedsterAdvanced_Model_Core_Design_Package extends Mage_Core_Model
 {
 
     protected $_speedsterBlacklists = array();
+    const CACHEKEY = 'fooman_speedster_advanced_';
+
+    protected function getNameMd5($files) {
+        return md5(implode(',', $files));
+    }
+
+    protected function getTargetFileName() {
+        $args = func_get_args();
+        $type = array_pop($args);
+        return implode('-', $args) . '.' . $type;
+    }
 
     public function __construct()
     {
@@ -67,21 +78,33 @@ class Fooman_SpeedsterAdvanced_Model_Core_Design_Package extends Mage_Core_Model
      */
     public function getMergedJsUrl($files)
     {
-        $jsBuild = Mage::getModel('speedsterAdvanced/buildSpeedster')->__construct($files, BP);
-        $targetFilename = md5(implode(',', $files)) . '-' . $jsBuild->getLastModified() . '.js';
-        if (file_exists(Mage::getBaseDir('media') . '/js/' . $targetFilename)) {
-            return Mage::getBaseUrl('media') . 'js/' . $targetFilename;
-        }
         $targetDir = $this->_initMergerDir('js');
         if (!$targetDir) {
             return '';
         }
-        if (Mage::helper('core')
-            ->mergeFiles(
-                $files, $targetDir . DS . $targetFilename, false, array($this, 'beforeMergeJs'), 'js'
-            )
-        ) {
-            return Mage::getBaseUrl('media') . 'js/' . $targetFilename;
+        $nameMd5 = $this->getNameMd5($files);
+        $fileKey = self::CACHEKEY . 'js_' . $nameMd5;
+        $fileHash = Mage::app()->loadCache($fileKey);
+        if ($fileHash) {
+            $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, 'js');
+            if (file_exists(Mage::getBaseDir('media') . '/js/' . $targetFilename)) {
+                return Mage::getBaseUrl('media') . 'js/' . $targetFilename;
+            }
+        } else {
+            $tmpPath = tempnam(sys_get_temp_dir(), $fileKey);
+            touch($tmpPath, 1);
+            if (Mage::helper('core')
+                ->mergeFiles(
+                    $files, $tmpPath, false, array($this, 'beforeMergeJs'), 'js'
+                )
+            ) {
+                $fileHash = md5(file_get_contents($tmpPath));
+                $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, 'js');
+                $targetPath = $targetDir . DS . $targetFilename;
+                rename($tmpPath, $targetPath);
+                Mage::app()->saveCache($fileHash, $fileKey, array(), false);
+                return Mage::getBaseUrl('media') . 'js/' . $targetFilename;
+            }
         }
         return '';
     }
@@ -133,37 +156,38 @@ class Fooman_SpeedsterAdvanced_Model_Core_Design_Package extends Mage_Core_Model
      */
     public function getMergedCssUrl($files)
     {
-        $cssBuild = Mage::getModel('speedsterAdvanced/buildSpeedster')->__construct($files, BP);
-        $targetDir = $this->_initMergerDir('css');
+        $storeId = Mage::app()->getStore()->getId();
+        $isSecure = Mage::app()->getStore()->isCurrentlySecure();
+        $mergerDir = $isSecure ? 'css_secure' : 'css';
+        $callback = $isSecure ? 'beforeMergeCssSecure' : 'beforeMergeCss';
+        $targetDir = $this->_initMergerDir($mergerDir);
         if (!$targetDir) {
             return '';
         }
-        $storeId = Mage::app()->getStore()->getId();
-        if (Mage::app()->getStore()->isCurrentlySecure()) {
-            $targetFilename
-                = md5(implode(',', $files)) . '-' . $storeId . '-SSL-' . $cssBuild->getLastModified() . '.css';
-            if (file_exists(Mage::getBaseDir('media') . '/css_secure/' . $targetFilename)) {
-                return Mage::getBaseUrl('media') . 'css_secure/' . $targetFilename;
-            }
-            if (Mage::helper('core')
-                ->mergeFiles(
-                    $files, $targetDir . DS . $targetFilename, false, array($this, 'beforeMergeCssSecure'), 'css'
-                )
-            ) {
-                return Mage::getBaseUrl('media') . 'css/' . $targetFilename;
+        $nameMd5 = $this->getNameMd5($files);
+        $fileKey = self::CACHEKEY . $mergerDir . '_' . $nameMd5;
+        $fileHash = Mage::app()->loadCache($fileKey);
+        if ($fileHash) {
+            $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, $storeId, 'css');
+            if (file_exists(Mage::getBaseDir('media') . '/' . $mergerDir . '/' . $targetFilename)) {
+                return Mage::getBaseUrl('media') . $mergerDir . '/' . $targetFilename;
             }
         } else {
-            $targetFilename = md5(implode(',', $files)) . '-' . $storeId . '-' . $cssBuild->getLastModified() . '.css';
-            if (file_exists(Mage::getBaseDir('media') . '/css/' . $targetFilename)) {
-                return Mage::getBaseUrl('media') . 'css/' . $targetFilename;
-            }
+            $tmpPath = tempnam(sys_get_temp_dir(), $fileKey);
+            touch($tmpPath, 1);
             if (Mage::helper('core')
                 ->mergeFiles(
-                    $files, $targetDir . DS . $targetFilename, false, array($this, 'beforeMergeCss'), 'css'
+                    $files, $tmpPath, false, array($this, $callback), 'css'
                 )
             ) {
-                return Mage::getBaseUrl('media') . 'css/' . $targetFilename;
+                $fileHash = md5(file_get_contents($tmpPath));
+                $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, $storeId, 'css');
+                $targetPath = $targetDir . DS . $targetFilename;
+                rename($tmpPath, $targetPath);
+                Mage::app()->saveCache($fileHash, $fileKey, array(), false);
+                return Mage::getBaseUrl('media') . $mergerDir . '/' . $targetFilename;
             }
+
         }
         return '';
     }
