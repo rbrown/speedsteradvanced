@@ -90,21 +90,20 @@ class Fooman_SpeedsterAdvanced_Model_Core_Design_Package extends Mage_Core_Model
             if (file_exists(Mage::getBaseDir('media') . '/js/' . $targetFilename)) {
                 return Mage::getBaseUrl('media') . 'js/' . $targetFilename;
             }
-        } else {
-            $tmpPath = tempnam(sys_get_temp_dir(), $fileKey);
-            touch($tmpPath, 1);
-            if (Mage::helper('core')
-                ->mergeFiles(
-                    $files, $tmpPath, false, array($this, 'beforeMergeJs'), 'js'
-                )
-            ) {
-                $fileHash = md5(file_get_contents($tmpPath));
-                $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, 'js');
-                $targetPath = $targetDir . DS . $targetFilename;
-                rename($tmpPath, $targetPath);
-                Mage::app()->saveCache($fileHash, $fileKey, array(), false);
-                return Mage::getBaseUrl('media') . 'js/' . $targetFilename;
-            }
+        }
+        $tmpPath = tempnam(sys_get_temp_dir(), $fileKey);
+        touch($tmpPath, 1);
+        if (Mage::helper('core')
+            ->mergeFiles(
+                $files, $tmpPath, false, array($this, 'beforeMergeJs'), 'js'
+            )
+        ) {
+            $fileHash = md5(file_get_contents($tmpPath));
+            $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, 'js');
+            $targetPath = $targetDir . DS . $targetFilename;
+            rename($tmpPath, $targetPath);
+            Mage::app()->saveCache($fileHash, $fileKey, array(), false);
+            return Mage::getBaseUrl('media') . 'js/' . $targetFilename;
         }
         return '';
     }
@@ -172,22 +171,20 @@ class Fooman_SpeedsterAdvanced_Model_Core_Design_Package extends Mage_Core_Model
             if (file_exists(Mage::getBaseDir('media') . '/' . $mergerDir . '/' . $targetFilename)) {
                 return Mage::getBaseUrl('media') . $mergerDir . '/' . $targetFilename;
             }
-        } else {
-            $tmpPath = tempnam(sys_get_temp_dir(), $fileKey);
-            touch($tmpPath, 1);
-            if (Mage::helper('core')
-                ->mergeFiles(
-                    $files, $tmpPath, false, array($this, $callback), 'css'
-                )
-            ) {
-                $fileHash = md5(file_get_contents($tmpPath));
-                $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, $storeId, 'css');
-                $targetPath = $targetDir . DS . $targetFilename;
-                rename($tmpPath, $targetPath);
-                Mage::app()->saveCache($fileHash, $fileKey, array(), false);
-                return Mage::getBaseUrl('media') . $mergerDir . '/' . $targetFilename;
-            }
-
+        }
+        $tmpPath = tempnam(sys_get_temp_dir(), $fileKey);
+        touch($tmpPath, 1);
+        if (Mage::helper('core')
+            ->mergeFiles(
+                $files, $tmpPath, false, array($this, $callback), 'css'
+            )
+        ) {
+            $fileHash = md5(file_get_contents($tmpPath));
+            $targetFilename = $this->getTargetFileName($nameMd5, $fileHash, $storeId, 'css');
+            $targetPath = $targetDir . DS . $targetFilename;
+            rename($tmpPath, $targetPath);
+            Mage::app()->saveCache($fileHash, $fileKey, array(), false);
+            return Mage::getBaseUrl('media') . $mergerDir . '/' . $targetFilename;
         }
         return '';
     }
